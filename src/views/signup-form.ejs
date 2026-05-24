@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Sign-up</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="auth-form.css">
+</head>
+
+<body>
+  <main class="auth">
+    <h1>Sign-up</h1>
+    <form action="/users" method="POST">
+      <input name="full_name" id="full_name" placeholder="Full Name" required>
+      <input name="username" id="username" placeholder="Username" required />
+      <input name="email" id="email" placeholder="Email" type="email" required>
+      <input name="password" id="password" placeholder="Password" type="password" required />
+    
+      <label for="group_member">I am a member of this club</label>
+      <input type="checkbox" id="group_member">
+    
+      <input name="club_key" id="club_key" placeholder="Club Secret">
+    
+      <button type="submit">Sign-up</button>
+    </form>
+    <p>Already have an account? <a href="/log-in">Log-in!</a></p>
+  </main>
+</body>
+
+</html>

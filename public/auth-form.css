@@ -1,0 +1,28 @@
+body {
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  height: 100dvh;
+}
+
+.auth {
+  background-color: gray;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+
+  &>form {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+#club_key {
+  display: none;
+}
+
+#group_member:checked+#club_key {
+  display: block;
+}
