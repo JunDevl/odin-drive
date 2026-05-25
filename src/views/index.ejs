@@ -8,7 +8,68 @@
 </head>
 
 <body>
-  <p>home</p>
+  <nav id="top">
+    <form action="/drive" method="GET" id="search">
+      <input type="text" name="query" id="query" placeholder="Search">
+    </form>
+    <button>+ Add</button>
+  </nav>
+  <main id="explorer">
+    <dialog id="add_menu">
+      <nav>
+        <ul>
+          <li>
+            <input type="button" value="Folder"/>
+          </li>
+          <li>
+            <input type="file" value="File"/>
+          </li>
+        </ul>
+      </nav>
+    </dialog>
+    <dialog id="new_folder">
+      <form action="/drive" method="POST">
+        <h3>Create a new folder</h3>
+        <input type="text" name="folder_name" id="folder_name" placeholder="Folder Name">
+        <button type="submit">Create</button>
+        <button>Cancel</button>
+      </form>
+    </dialog>
+    <table id="files">
+      <thead>
+        <tr>
+          <td id="select">
+            <input type="checkbox" name="select_all" id="select_all">
+          </td>
+          <td id="icon"></td>
+          <td id="name">
+            Name
+          </td>
+          <td id="name">
+            Name
+          </td>
+        </tr>
+      </thead>
+      <tbody>
+        <% files.forEach(file => { %>
+          <tr>
+            <td class="select">
+              <input type="checkbox">
+            </td>
+            <td class="file_icon">
+              <img class="file_icon" alt="File/Folder Icon"></img>
+            </td>
+            <td class="file_name">
+              <%= file.name %>
+            </td>
+            <td class="file_size">
+              <%= file.sizeBytes %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </main>
 </body>
 
 </html>
