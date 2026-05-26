@@ -5,6 +5,8 @@ import { PromiseError } from "../utils.ts";
 import { body, validationResult, type ValidationChain } from "express-validator";
 import passport from "passport";
 import prisma from "../../lib/prisma.ts";
+import multer from "multer";
+// const upload = multer({ storage: ##SUPABASE_STORAGE_ENGINE_HANDLER## }) todo!
 
 export const getUserFiles: RequestHandler = async (req, res) => {
   if (!req.isAuthenticated()) return res.redirect("/log-in");
@@ -28,4 +30,13 @@ export const getUserFiles: RequestHandler = async (req, res) => {
   }) ?? []
 
   return res.render("index", { files, query });
+}
+
+export const createFile: RequestHandler = async (req, res) => {
+  const user: User = req.user as User;
+}
+
+export const deleteFiles: RequestHandler = async (req, res) => {
+  const user: User = req.user as User;
+
 }

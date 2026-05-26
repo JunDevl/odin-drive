@@ -21,9 +21,11 @@ li {
   justify-content: center;
   align-items: center;
   gap: 2rem;
+  background-color: antiquewhite;
 }
 
 #explorer {
+  background-color: bisque;
   margin-top: 2rem;
   margin-inline: 5rem;
   display: flex;
@@ -52,6 +54,14 @@ li {
 }
 
 table {
+  background-color: beige;
+  margin: 0.25rem;
+
+  & .select,
+  & .icon {
+    white-space: nowrap;
+    width: 0;
+  }
 
   &>tbody {
 

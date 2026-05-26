@@ -24,18 +24,19 @@
       </nav>
     </dialog>
     <dialog id="new_folder">
-      <form action="/drive" method="POST">
+      <form action="/drive" method="POST" enctype="multipart/form-data">
         <h3>Create a new folder</h3>
         <input type="text" name="folder_name" id="folder_name" placeholder="Folder Name">
         <button type="submit" class="create">Create</button>
         <button class="cancel">Cancel</button>
       </form>
     </dialog>
+    <h3>My files and folders</h3>
     <table id="files">
       <thead>
         <tr>
-          <td id="select"><input type="checkbox" name="select_all" id="select_all"></td>
-          <td id="icon"></td>
+          <td class="select"><input type="checkbox" name="select_all" id="select_all"></td>
+          <td class="icon"></td>
           <td id="name">Name</td>
           <td id="size">Size</td>
         </tr>
@@ -45,26 +46,33 @@
           <% files.forEach(file => { %>
             <tr>
               <td class="select"><input type="checkbox"></td>
-              <td class="file_icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
+              <td class="icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
               <td class="file_name"><%= file.name %></td>
               <td class="file_size"><%= file.sizeBytes %></td>
             </tr>
           <% }) %>
         <% } else { %>
-          <tr><td rowspan="4">No files uploaded.</td></tr>
+          <tr><td colspan="4">No files uploaded.</td></tr>
         <% } %>
       </tbody>
     </table>
   </main>
   <script>
     const newFolderDialog = document.querySelector("#new_folder");
+
+    const newFolderForm = newFolderDialog.querySelector("form");
+
     const newFolderButton = document.querySelector("#add_menu .folder");
 
-    const cancelFolderButton = document.querySelector("#new_folder .cancel");
+    const cancelFolderButton = newFolderDialog.querySelector(".cancel");
 
     newFolderButton.addEventListener("click", () => newFolderDialog.showModal());
 
     cancelFolderButton.addEventListener("click", () => newFolderDialog.close());
+
+    newFolderForm.addEventListener("submit", e => {
+      e.preventDefault();
+    })
   </script>
 </body>
 
