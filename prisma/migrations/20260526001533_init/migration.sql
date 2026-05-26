@@ -11,7 +11,8 @@ CREATE TABLE "Session" (
 -- CreateTable
 CREATE TABLE "User" (
     "id" UUID NOT NULL,
-    "name" TEXT NOT NULL,
+    "username" TEXT NOT NULL,
+    "fullName" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
 

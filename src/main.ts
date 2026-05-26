@@ -6,7 +6,6 @@ import session from "express-session";
 import passport from "passport";
 import LocalStrategy from "passport-local";
 import argon2 from "argon2";
-import postgres from "postgres";
 import authRouter from "./routes/authRouter.ts";
 import driveRouter from "./routes/driveRouter.ts";
 import prisma from "../lib/prisma.ts";
@@ -15,8 +14,6 @@ import { PrismaSessionStore } from "@quixo3/prisma-session-store";
 const __dirname = path.resolve();
 
 const PORT = 3000;
-
-const sql = postgres(process.env["DATABASE_URL"]!);
 
 const app = express();
 app.use(express.static(__dirname + '/public'));
@@ -50,8 +47,9 @@ passport.use(new LocalStrategy.Strategy(
   },
   async (email, password, done) => {
   try {
-    const rows = await sql`SELECT * FROM users WHERE email = ${email}`;
-    const user = rows[0];
+    const user = await prisma.user.findUnique({
+      where: { email }
+    })
 
     if (!user) return done(null, false, { message: "Incorrect email" });
 
@@ -69,10 +67,11 @@ passport.serializeUser((user, done) => {
   done(null, (user as any).id);
 });
 
-passport.deserializeUser(async (id, done) => {
+passport.deserializeUser(async (id: string, done) => {
   try {
-    const rows = await sql`SELECT * FROM users WHERE id = ${id as any}`;
-    const [user] = rows;
+    const user = await prisma.user.findUnique({
+      where: { id }
+    });
 
     app.locals.user = user;
     done(null, user);

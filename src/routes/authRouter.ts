@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { createUser, upgradeUserStatus } from "../controllers/authController.ts";
+import { createUser } from "../controllers/authController.ts";
 import passport from "passport";
 
 const authRouter = Router();
 
 authRouter.get("/", (req, res) => {
-  if (req.isAuthenticated()) return res.redirect("/posts");
+  if (req.isAuthenticated()) return res.redirect("/drive");
 
   res.redirect("/log-in");
 });
@@ -14,7 +14,7 @@ authRouter
   .route("/log-in")
   .get((_, res) => res.render("login-form"))
   .post(passport.authenticate("local", {
-    successRedirect: "/posts",
+    successRedirect: "/drive",
     failureRedirect: "/log-in",
     failureMessage: "Failed to log-in."
   }));
@@ -32,6 +32,5 @@ authRouter
   
 authRouter.route("/users")
   .post(createUser as any)
-  .put(upgradeUserStatus);
 
 export default authRouter;

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Log In</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -12,18 +12,14 @@
     <form action="/drive" method="GET" id="search">
       <input type="text" name="query" id="query" placeholder="Search">
     </form>
-    <button>+ Add</button>
+    <button id="add_button" popovertarget="add_menu">+ Add</button>
   </nav>
   <main id="explorer">
-    <dialog id="add_menu">
+    <dialog id="add_menu" popover>
       <nav>
         <ul>
-          <li>
-            <input type="button" value="Folder"/>
-          </li>
-          <li>
-            <input type="file" value="File"/>
-          </li>
+          <li><input type="button" class="folder" value="Folder"/></li>
+          <li><input type="file" class="file"/></li>
         </ul>
       </nav>
     </dialog>
@@ -31,45 +27,45 @@
       <form action="/drive" method="POST">
         <h3>Create a new folder</h3>
         <input type="text" name="folder_name" id="folder_name" placeholder="Folder Name">
-        <button type="submit">Create</button>
-        <button>Cancel</button>
+        <button type="submit" class="create">Create</button>
+        <button class="cancel">Cancel</button>
       </form>
     </dialog>
     <table id="files">
       <thead>
         <tr>
-          <td id="select">
-            <input type="checkbox" name="select_all" id="select_all">
-          </td>
+          <td id="select"><input type="checkbox" name="select_all" id="select_all"></td>
           <td id="icon"></td>
-          <td id="name">
-            Name
-          </td>
-          <td id="name">
-            Name
-          </td>
+          <td id="name">Name</td>
+          <td id="size">Size</td>
         </tr>
       </thead>
       <tbody>
-        <% files.forEach(file => { %>
-          <tr>
-            <td class="select">
-              <input type="checkbox">
-            </td>
-            <td class="file_icon">
-              <img class="file_icon" alt="File/Folder Icon"></img>
-            </td>
-            <td class="file_name">
-              <%= file.name %>
-            </td>
-            <td class="file_size">
-              <%= file.sizeBytes %>
-            </td>
-          </tr>
-        <% }) %>
+        <% if (files.length > 0) {%>
+          <% files.forEach(file => { %>
+            <tr>
+              <td class="select"><input type="checkbox"></td>
+              <td class="file_icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
+              <td class="file_name"><%= file.name %></td>
+              <td class="file_size"><%= file.sizeBytes %></td>
+            </tr>
+          <% }) %>
+        <% } else { %>
+          <tr><td rowspan="4">No files uploaded.</td></tr>
+        <% } %>
       </tbody>
     </table>
   </main>
+  <script>
+    const newFolderDialog = document.querySelector("#new_folder");
+    const newFolderButton = document.querySelector("#add_menu .folder");
+
+    const cancelFolderButton = document.querySelector("#new_folder .cancel");
+
+    newFolderButton.addEventListener("click", () => newFolderDialog.showModal());
+
+    cancelFolderButton.addEventListener("click", () => newFolderDialog.close());
+  </script>
 </body>
 
 </html>

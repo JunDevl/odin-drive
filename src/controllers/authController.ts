@@ -7,9 +7,10 @@ import { handleError } from "../utils.ts";
 import { PromiseError } from "../utils.ts";
 import { body, validationResult, type ValidationChain } from "express-validator";
 import passport from "passport";
+import prisma from "../../lib/prisma.ts";
 
 const createUserValidator: ValidationChain[] = [
-  body("full_name")
+  body("fullName")
     .trim()
     .notEmpty(),
   body("username")
@@ -21,9 +22,7 @@ const createUserValidator: ValidationChain[] = [
     .notEmpty(),
   body("password")
     .trim()
-    .notEmpty(),
-  body("club_key")
-    .optional()
+    .notEmpty()
 ]
 
 export const createUser: (RequestHandler | ValidationChain[])[] = [
@@ -33,7 +32,7 @@ export const createUser: (RequestHandler | ValidationChain[])[] = [
 
     if (!validationErrors.isEmpty()) return res.status(400).send(validationErrors.array());
 
-    const {club_key, ...user} = req.body;
+    const user = req.body;
 
     const hashedPassword = await argon2.hash(user.password, {
       memoryCost: 65536,
@@ -42,31 +41,18 @@ export const createUser: (RequestHandler | ValidationChain[])[] = [
     })
 
     user.password = hashedPassword;
-    user.status = club_key === process.env["SECRET_CLUBHOUSE_KEY"] ? "member" : "visitor";
 
-    const createdUser = await handleError(insertUser(user));
+    const createdUser = await handleError(prisma.user.create({
+      data: user
+    }));
 
     if (createdUser instanceof PromiseError) return res.status(400).send(createdUser.error);
     
     return next();
   },
   passport.authenticate("local", {
-    successRedirect: "/posts",
+    successRedirect: "/drive",
     failureRedirect: "/log-in",
     failureMessage: "Failed to log-in."
   })
 ]
-
-export const upgradeUserStatus: RequestHandler = async (req, res) => {
-  if ((req.user! as any).status !== "visitor") return res.send("User is a member already.");
-
-  const {club_key} = req.body;
-
-  if (club_key !== process.env["SECRET_CLUBHOUSE_KEY"]) return res.status(400).send("Wrong key.");
-
-  const upgraded = await handleError(upgradeUserToMember((req.user! as any).id));
-
-  if (upgraded instanceof PromiseError) return res.status(400).send(upgraded.error);
-
-  return res.send(`Deleted user ${(req.user! as any).id}`);
-}
