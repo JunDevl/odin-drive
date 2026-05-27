@@ -9,24 +9,29 @@
 
 <body>
   <nav id="top">
+    <button id="add_button" popovertarget="add_menu">+ Add</button>
     <form action="/drive" method="GET" id="search">
       <input type="text" name="query" id="query" placeholder="Search">
     </form>
-    <button id="add_button" popovertarget="add_menu">+ Add</button>
   </nav>
   <main id="explorer">
     <dialog id="add_menu" popover>
       <nav>
         <ul>
           <li><input type="button" class="folder" value="Folder"/></li>
-          <li><input type="file" class="file"/></li>
+          <li>
+            <form action="/drive" method="POST" enctype="multipart/form-data">
+              <input type="file" class="file" name="file" />
+              <button type="submit">Send</button>
+            </form>
+          </li>
         </ul>
       </nav>
     </dialog>
     <dialog id="new_folder">
       <form action="/drive" method="POST" enctype="multipart/form-data">
         <h3>Create a new folder</h3>
-        <input type="text" name="folder_name" id="folder_name" placeholder="Folder Name">
+        <input type="text" name="file" id="file" placeholder="Folder Name">
         <button type="submit" class="create">Create</button>
         <button class="cancel">Cancel</button>
       </form>
@@ -61,6 +66,8 @@
     const newFolderDialog = document.querySelector("#new_folder");
 
     const newFolderForm = newFolderDialog.querySelector("form");
+    
+    // const newFileForm = document.querySelector("#add_menu form");
 
     const newFolderButton = document.querySelector("#add_menu .folder");
 
@@ -73,6 +80,10 @@
     newFolderForm.addEventListener("submit", e => {
       e.preventDefault();
     })
+
+    // newFileForm.addEventListener("submit", e => {
+    //   e.preventDefault();
+    // })
   </script>
 </body>
 

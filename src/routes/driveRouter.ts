@@ -4,7 +4,7 @@ import { createFile, deleteFiles, getUserFiles } from "../controllers/driveContr
 
 const driveRouter = Router();
 
-driveRouter.route("/")
+driveRouter.route("/{*splat}")
   .get(getUserFiles)
   .post(createFile)
   .delete(deleteFiles);

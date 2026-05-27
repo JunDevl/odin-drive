@@ -1,10 +1,11 @@
 :root {
-  font-size: 16px;
+  font-size: 18px;
 }
 
-body:not(#auth) {
+body {
   padding: 0;
   margin: 0;
+  background-color: blueviolet;
 }
 
 /* dialog {
@@ -27,7 +28,7 @@ li {
 #explorer {
   background-color: bisque;
   margin-top: 2rem;
-  margin-inline: 5rem;
+  margin-inline: max(5%, 1rem);
   display: flex;
   flex-direction: column;
   justify-content: start;
@@ -40,6 +41,7 @@ li {
 #add_menu {
   position: absolute;
   position-anchor: --add_button;
+  position-area: bottom;
 
   & ul {
     display: flex;
@@ -55,7 +57,7 @@ li {
 
 table {
   background-color: beige;
-  margin: 0.25rem;
+  margin: 0.5rem;
 
   & .select,
   & .icon {
