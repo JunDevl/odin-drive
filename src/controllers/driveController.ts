@@ -11,24 +11,19 @@ const upload = multer({ storage: multer.memoryStorage() }) //TODO!
 
 export const getUserFiles: RequestHandler = async (req, res) => {
   if (!req.isAuthenticated()) return res.redirect("/log-in");
-  
+                                                              
   const query = req.query.query as string | undefined;
 
-  const user: User = req.user as User;
+  const user: User = req.user as User;  
 
   if (query === "") return res.redirect("/drive");
 
-  const files = await prisma.file.findMany({
-    where: { ownerId: user.id },
-    orderBy: {
-      _relevance: !query ? undefined : {
-        fields: ["path"],
-        search: query,
-        sort: "desc",
-      },
-      path: "desc"
-    }
-  }) ?? []
+  const sqlQuery = `^${req.path === "/" ? "" : req.path}/[^/]+/?$` // 
+
+  const files = await prisma.$queryRaw`
+    SELECT * FROM "File" 
+    WHERE path ~ ${sqlQuery}
+  ` ?? []
 
   return res.render("index", { files, query });
 }
@@ -38,13 +33,26 @@ export const createFile: RequestHandler[] = [
   async (req, res, next) => {
     const user: User = req.user as User;
 
-    const filename = req.file?.originalname;
-    const path = `${req.params.rest}${filename}`
+    const filename = req.file ? req.file.originalname : req.body.file;
+    const drivePath = `${req.path}${filename}`
+    const supabasePath = `${user.id}/${drivePath}`
 
-    console.log(path);
-    console.log(req.file!);
+    const folder = await prisma.file.create({
+      data: {
+        path: req.file ? drivePath : `${drivePath}/`,
+        ownerId: user.id
+      }
+    })
 
-    return next();
+    if (!req.file) return res.send('Folder created');
+ 
+    const { data, error } = await supabase.storage
+      .from("drives")
+      .upload(supabasePath, req.file.buffer);
+
+    if (error) return res.status(400).send(error);
+
+    return res.send(data);
   }
 ]
 
