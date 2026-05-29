@@ -13,14 +13,15 @@ export const getUserFiles: RequestHandler = async (req, res) => {
   if (!req.isAuthenticated()) return res.redirect("/log-in");
                                                               
   const query = req.query.query as string | undefined;
+  const path = req.query.path || "";
 
-  const user: User = req.user as User;  
+  const user: User = req.user as User;
 
   if (query === "") return res.redirect("/drive");
 
-  const sqlQuery = `^${req.path === "/" ? "" : req.path}/[^/]+/?$` // 
+  const sqlQuery = `^${path}/[^/]+/?$` //
 
-  const files = await prisma.$queryRaw`
+  const files: File[] = await prisma.$queryRaw`
     SELECT * FROM "File" 
     WHERE path ~ ${sqlQuery}
   ` ?? []
@@ -33,14 +34,16 @@ export const createFile: RequestHandler[] = [
   async (req, res, next) => {
     const user: User = req.user as User;
 
+    // const supabaseData = await supabase.auth.getUser();
+
     const filename = req.file ? req.file.originalname : req.body.file;
-    const drivePath = `${req.path}${filename}`
-    const supabasePath = `${user.id}/${drivePath}`
+    const drivePath = `${req.query.path || ""}/${filename}`
+    const supabasePath = `${user!.id}${drivePath}`
 
     const folder = await prisma.file.create({
       data: {
         path: req.file ? drivePath : `${drivePath}/`,
-        ownerId: user.id
+        ownerId: user!.id
       }
     })
 
