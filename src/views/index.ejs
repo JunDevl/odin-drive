@@ -43,7 +43,7 @@
           <td class="select"><input type="checkbox" name="select_all" id="select_all"></td>
           <td class="icon"></td>
           <td id="name">Name</td>
-          <td id="size">Size</td>
+          <td id="size">Size (KB)</td>
         </tr>
       </thead>
       <tbody>
@@ -53,7 +53,7 @@
               <td class="select"><input type="checkbox"></td>
               <td class="icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
               <td class="file_name"><%= file.name %></td>
-              <td class="file_size"><%= file.sizeBytes %></td>
+              <td class="file_size"><%= Intl.NumberFormat().format(file.metadata.size) %></td>
             </tr>
           <% }) %>
         <% } else { %>

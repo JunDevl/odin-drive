@@ -49,7 +49,7 @@ passport.use(new LocalStrategy.Strategy(
   try {
     const user = await prisma.user.findUnique({
       where: { email }
-    })
+    });
 
     if (!user) return done(null, false, { message: "Incorrect email" });
 

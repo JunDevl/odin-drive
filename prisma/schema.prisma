@@ -32,6 +32,7 @@ model User {
 
 model File {
   path       String @id
+  name       String
   owner      User   @relation("OwnedFiles", fields: [ownerId], references: [id])
   ownerId    String @db.Uuid
   sharedWith User[]
