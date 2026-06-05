@@ -43,7 +43,7 @@ li {
   position-anchor: --add_button;
   position-area: bottom;
 
-  & ul {
+  &>div {
     display: flex;
     flex-direction: column;
     padding: 0.3rem;
@@ -55,9 +55,21 @@ li {
   }
 }
 
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+}
+
+#select_toolbar:not([hidden]) {
+  display: flex;
+  align-items: center;
+}
+
 table {
   background-color: beige;
   margin: 0.5rem;
+  border-spacing: 0;
 
   & .select,
   & .icon {
@@ -76,8 +88,22 @@ table {
         }
       }
 
-      &:hover>.select {
-        opacity: 1;
+      &:hover {
+        background-color: brown;
+      }
+
+      &.file:hover,
+      &.folder:hover {
+
+
+        &>.file_name span:hover {
+          text-decoration: underline;
+          cursor: pointer;
+        }
+
+        &>.select {
+          opacity: 1;
+        }
       }
     }
 

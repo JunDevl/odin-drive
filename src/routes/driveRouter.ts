@@ -1,13 +1,20 @@
 import { Router } from "express";
-import { createFile, deleteFiles, getUserFiles } from "../controllers/driveController.ts";
+import { createFile, deleteFiles, getUserFiles, renameFile, updateFiles } from "../controllers/driveController.ts";
 
 
 const driveRouter = Router();
 
-driveRouter.route("{*splat}")
+driveRouter.use((req, res, next) => {
+  if (!req.isAuthenticated()) return res.redirect("/log-in");
+  return next();
+});
+
+driveRouter.route("/{*splat}")
   .get(getUserFiles)
   .delete(deleteFiles)
-  .post(createFile);
+  .post(createFile)
+  .patch(renameFile)
+  .put(updateFiles);
 
 
 export default driveRouter;

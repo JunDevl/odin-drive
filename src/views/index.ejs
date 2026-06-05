@@ -3,8 +3,8 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Log In</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>My Drive</title>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 
 <body>
@@ -15,76 +15,298 @@
     </form>
   </nav>
   <main id="explorer">
-    <dialog id="add_menu" popover>
-      <nav>
-        <ul>
-          <li><input type="button" class="folder" value="Folder"/></li>
-          <li>
-            <form action="/drive" method="POST" enctype="multipart/form-data">
-              <input type="file" class="file" name="file" />
-              <button type="submit">Send</button>
-            </form>
-          </li>
-        </ul>
-      </nav>
-    </dialog>
-    <dialog id="new_folder">
-      <form action="/drive" method="POST" enctype="multipart/form-data">
-        <h3>Create a new folder</h3>
-        <input type="text" name="file" id="file" placeholder="Folder Name">
-        <button type="submit" class="create">Create</button>
-        <button class="cancel">Cancel</button>
-      </form>
-    </dialog>
     <h3>My files and folders</h3>
+    <nav class="breadcrumb paths">
+      <a class="path" href="/drive">My Drive</a>
+      <% if (path !== "/") { %>
+        <% let pathAcc = "/drive" %>
+        <% pathArray.forEach(pathName => { %>
+          <% pathAcc += `/${pathName}` %>
+          <a class="path" href="<%= pathAcc %>">
+            <%= pathName || "/" %>
+          </a>
+        <% }) %>
+      <% } %>    
+    </nav>
+    <nav id="select_toolbar" hidden>
+      <div id="delete_files">
+        <button id="delete">Delete</button>
+      </div>
+      <div id="update_files">
+        <button id="move">Move</button>
+        <button id="copy">Copy</button>
+      </div>
+      <div id="rename_file" hidden>
+        <button id="rename">Rename</button>
+      </div>
+      <script>
+        const fileToolbar = document.querySelector("#select_toolbar");
+
+        const deleteButton = fileToolbar.querySelector("button#delete");
+        const moveButton = fileToolbar.querySelector("button#move");
+        const copyButton = fileToolbar.querySelector("button#copy");
+
+        const renameFileContainer = document.querySelector("div#rename_file");
+        const renameButton = renameFileContainer.querySelector("button#rename");
+
+        deleteButton.addEventListener("click", () => {
+          const fileCount = deleteForm.querySelector("span.file_count");
+
+          fileCount.textContent = selectedPaths.size;
+
+          deleteModal.showModal();
+        });
+
+        function updateFile(e, type) {
+          const fileCount = updateForm.querySelector("span.file_count");
+          const verb = updateForm.querySelector("span.update_verb");
+          const term = updateForm.querySelector("span.update_term");
+
+          fileCount.textContent = selectedPaths.size;
+          verb.textContent = type === "move" ? "Moving" : "Copying";
+          term.textContent = type === "move" ? "Move" : "Copy";
+
+          updateModal.className = type;
+
+          updateModal.showModal();
+        }
+
+        moveButton.addEventListener("click", e => updateFile(e, "move"));
+        copyButton.addEventListener("click", e => updateFile(e, "copy"));
+
+        renameButton.addEventListener("click", () => {
+          const [filePath] = Array.from(selectedPaths);
+          const fileRow = document.getElementById(filePath);
+
+          const fileName = fileRow.dataset.name;
+
+          nameInput.value = fileName;
+
+          renameDialog.showModal();
+        });
+      </script>
+    </nav>
     <table id="files">
       <thead>
         <tr>
-          <td class="select"><input type="checkbox" name="select_all" id="select_all"></td>
+          <td class="select" id="select_all"><input type="checkbox"></td>
           <td class="icon"></td>
           <td id="name">Name</td>
           <td id="size">Size (KB)</td>
         </tr>
       </thead>
       <tbody>
+        <% if (path !== "/" ) { %>
+          <tr class="return">
+            <td colspan="4"><a href="<%= `/drive${path.slice(0, -(path.split("/").at(-1).length + 1))}` %>">&lt;--</a></td>
+          </tr>
+        <% } %>
         <% if (files.length > 0) {%>
           <% files.forEach(file => { %>
-            <tr>
+            <tr class="<%= file.kind %>" id="<%= file.path %>" data-name="<%= file.name %>">
               <td class="select"><input type="checkbox"></td>
               <td class="icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
-              <td class="file_name"><%= file.name %></td>
-              <td class="file_size"><%= Intl.NumberFormat().format(file.metadata.size) %></td>
+              <td class="file_name">
+                <% if (file.kind !== "folder") { %>
+                  <span><%= file.name %></span>
+                <% } else { %> 
+                  <span>
+                    <a href="<%= `/drive${path === "/" ? "" : path}/${file.name}` %>"><%= file.name %></a>
+                  </span>
+                <% } %>
+              </td>
+              <td class="file_size">
+                <%= file.metadata.size !== null ? Intl.NumberFormat().format(file.metadata.size) : "" %>
+              </td>
             </tr>
           <% }) %>
         <% } else { %>
-          <tr><td colspan="4">No files uploaded.</td></tr>
+          <tr class="empty_files"><td colspan="4">No files uploaded.</td></tr>
         <% } %>
       </tbody>
+      <script>
+        const table = document.querySelector("table");
+        const selectAll = document.querySelector("#select_all>input");
+        const rows = document.querySelectorAll("tbody>tr:not(.return)");
+
+        let selectedPaths = new Set();
+
+        function handleSelectAll(e) {
+          if (e.target.checked) rows.forEach(cell => {
+            selectedPaths.add(cell.id);
+            const input = cell.querySelector(".select>input");
+            input.checked = true;
+          });
+          else {
+            selectedPaths.clear();
+            rows.forEach(cell => {
+              const input = cell.querySelector(".select>input");
+              input.checked = false;
+            });
+          }
+        }
+
+        function handleSelectCell(e) {
+          const row = e.target.closest("tr");
+
+          if (e.target.checked) selectedPaths.add(row.id);
+          else selectedPaths.delete(row.id);
+
+          if (selectedPaths.size === rows.length) {
+            selectAll.checked = true;
+            return;
+          }
+
+          selectAll.checked = false;
+        }
+
+        function handleFileClick(e) {
+
+        }
+
+        table.addEventListener("click", e => {
+          (() => {
+            if (e.target.matches(".file>.file_name span")) return handleFileClick(e);
+            if (e.target.matches("#select_all>input")) return handleSelectAll(e);
+            if (e.target.matches("td.select>input")) return handleSelectCell(e);
+          })();
+
+          if (selectedPaths.size > 0) fileToolbar.removeAttribute("hidden");
+          else fileToolbar.setAttribute("hidden", true);
+
+          if (selectedPaths.size === 1) renameFileContainer.removeAttribute("hidden");
+          else renameFileContainer.setAttribute("hidden", true);
+        })
+      </script>
     </table>
   </main>
-  <script>
-    const newFolderDialog = document.querySelector("#new_folder");
+  <dialog id="add_menu" popover>
+    <div>
+      <button class="create_folder">Folder</button>
+      <form method="POST" enctype="multipart/form-data">
+        <input type="file" class="file" name="file" />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </dialog>
+  <dialog id="new_folder">
+    <form method="POST" enctype="multipart/form-data">
+      <h3>Create a new folder</h3>
+      <input type="text" name="file" id="file" placeholder="Folder Name">
+      <button type="submit" class="create">Create</button>
+      <button type="button" class="cancel">Cancel</button>
+    </form>
+    <script>
+      const newFolderModal = document.querySelector("dialog#new_folder");
+      const addFolderButton = document.querySelector("dialog#add_menu button.create_folder");
 
-    const newFolderForm = newFolderDialog.querySelector("form");
-    
-    // const newFileForm = document.querySelector("#add_menu form");
+      addFolderButton.addEventListener("click", () => newFolderModal.showModal());
 
-    const newFolderButton = document.querySelector("#add_menu .folder");
+      const cancelFolderButton = newFolderModal.querySelector("button.cancel");
 
-    const cancelFolderButton = newFolderDialog.querySelector(".cancel");
+      cancelFolderButton.addEventListener("click", () => newFolderModal.close());
+    </script>
+  </dialog>
+  <dialog id="delete_dialog">
+    <form id="delete_form">
+      <p>Are you sure you want to delete <span class="file_count"></span> file(s)?</p>
+      <button type="submit" class="delete">Yes, delete it</button>
+      <button type="button" class="cancel">Cancel</button>
+    </form>
+    <script>
+      const deleteModal = document.querySelector("dialog#delete_dialog");
+      const deleteForm = document.querySelector("#delete_form");
+      const cancelDeleteButton = deleteForm.querySelector("button.cancel");
 
-    newFolderButton.addEventListener("click", () => newFolderDialog.showModal());
+      let hasDeleted = false;
 
-    cancelFolderButton.addEventListener("click", () => newFolderDialog.close());
+      deleteForm.addEventListener("submit", async e => {
+        if (hasDeleted) return;
 
-    // newFolderForm.addEventListener("submit", e => {
-    //   e.preventDefault();
-    // })
+        hasDeleted = true;
 
-    // newFileForm.addEventListener("submit", e => {
-    //   e.preventDefault();
-    // })
-  </script>
+        const query = new URLSearchParams();
+
+        selectedPaths.forEach(path => {
+          query.append("file_path", path);
+        });
+
+        await fetch(`${location.origin}/drive?${query}`, {
+          method: "DELETE"
+        });
+      })
+
+      cancelDeleteButton.addEventListener("click", () => deleteModal.close());
+    </script>
+  </dialog>
+  <dialog id="update_dialog" class="file_tree">
+    <form id="update_form">
+      <p><span class="update_verb"></span> <span class="file_count"></span> file(s) to destination</p>
+      <div class="destination_input">
+        <p class="root">/</p>
+        <input type="text" class="destination" placeholder="Destination Path">
+      </div>
+      <button type="submit" class="update"><span class="update_term"></span></button>
+      <button type="button" class="cancel">Cancel</button>
+    </form>
+    <script>
+      const updateModal = document.querySelector("dialog#update_dialog");
+      const updateForm = document.querySelector("form#update_form");
+      const cancelUpdateButton = updateForm.querySelector("button.cancel");
+      const destinationPathInput = updateForm.querySelector("input.destination");
+
+      let hasUpdated = false;
+      updateForm.addEventListener("submit", async e => {
+        if (hasUpdated) return;
+        hasUpdated = true;
+
+        const query = new URLSearchParams();
+
+        query.set(updateModal.className, destinationPathInput.value);
+
+        selectedPaths.forEach(path => {
+          query.append("file_path", path);
+        });
+
+        await fetch(`${location.origin}/drive?${query}`, {
+          method: "PUT",
+          body: query
+        });
+      });
+
+      cancelUpdateButton.addEventListener("click", () => updateModal.close());
+    </script>
+  </dialog>
+  <dialog id="rename_dialog">
+    <form id="rename_form">
+      <input type="text" placeholder="File name" class="name">
+      <button type="submit" class="rename">Rename</button>
+      <button type="button" class="cancel">Cancel</button>
+    </form>
+    <script>
+      const renameModal = document.querySelector("dialog#rename_dialog");
+      const renameForm = document.querySelector("form#rename_form");
+      const cancelRenameButton = renameForm.querySelector("button.cancel");
+      const nameInput = renameForm.querySelector("input.name");
+
+      let hasRenamed = false;
+      renameForm.addEventListener("submit", async e => {
+        if (hasRenamed) return;
+        hasRenamed = true;
+
+        const query = new URLSearchParams({
+          path: Array.from(selectedPaths)[0],
+          rename: nameInput.value
+        });
+
+        await fetch(`${location.origin}/drive?${query}`, {
+          method: "PATCH"
+        });
+      })
+
+      cancelRenameButton.addEventListener("click", () => renameModal.close());
+    </script>
+  </dialog>
 </body>
 
 </html>

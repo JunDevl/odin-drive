@@ -10,8 +10,7 @@ authRouter.get("/", (req, res) => {
   res.redirect("/log-in");
 });
 
-authRouter
-  .route("/log-in")
+authRouter.route("/log-in")
   .get((_, res) => res.render("login-form"))
   .post(passport.authenticate("local", {
     successRedirect: "/drive",
@@ -26,11 +25,10 @@ authRouter.get("/log-out", (req, res, next) => {
   });
 });
 
-authRouter
-  .route("/sign-up")
+authRouter.route("/sign-up")
   .get((_, res) => res.render("signup-form"));
   
 authRouter.route("/users")
-  .post(createUser as any)
+  .post(createUser as any);
 
 export default authRouter;
