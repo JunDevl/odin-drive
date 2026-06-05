@@ -15,8 +15,9 @@ const getQueryParamsPath = (params: Record<string, any>) =>
 
 export const getUserFiles: RequestHandler = async (req, res) => {        
   const query = req.query.query as string | undefined;
+  const path = req.query.path || "";
 
-  const user: User = req.user as User;  
+  const user: User = req.user as User;
 
   if (query === "") return res.redirect("/drive");
 
