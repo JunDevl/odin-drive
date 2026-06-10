@@ -10,10 +10,13 @@ import authRouter from "./routes/authRouter.ts";
 import driveRouter from "./routes/driveRouter.ts";
 import prisma from "../lib/prisma.ts";
 import { PrismaSessionStore } from "@quixo3/prisma-session-store";
+import crypto from "node:crypto";
 
 const __dirname = path.resolve();
 
 const PORT = 3000;
+
+crypto.createHmac("sha-1", "test").update("foo").digest("base64");
 
 const app = express();
 app.use(express.static(__dirname + '/public'));

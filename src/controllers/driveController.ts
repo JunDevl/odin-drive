@@ -1,17 +1,33 @@
 import type { RequestHandler } from "express";
 import type { User, Folder } from "../generated/prisma/client.ts";
-import { handleError } from "../utils.ts";
-import { PromiseError } from "../utils.ts";
+import { handleError, PromiseError } from "../utils.ts";
 import { body, validationResult, type ValidationChain } from "express-validator";
 import passport from "passport";
 import prisma from "../../lib/prisma.ts";
 import supabase from "../../lib/supabase.ts";
 import multer from "multer";
-const upload = multer({ storage: multer.memoryStorage() }) //TODO!
+import type { PrismaPromise } from "@prisma/client/runtime/client";
+const upload = multer({ storage: multer.memoryStorage() })
 
-const getQueryParamsPath = (params: Record<string, any>) => 
+const queryParamsPath = (params: Record<string, any>) => 
   !params.splat || !(params.splat instanceof Array) ? "/" : 
   (params.splat as string[]).reduce((acc, cur) => `${acc !== "/" ? acc : ""}/${cur}`, "/");
+
+const getFolderChildrenQuery = (path: string) => {
+  const searchQuery = path + "%";
+
+  const query = prisma.$queryRaw`
+    SELECT * FROM "Folder"
+    WHERE path LIKE ${searchQuery}
+  `;
+
+  query.then(res => ({
+    parent: path,
+    children: res
+  }))
+
+  return query as Promise<{parent: string, children: Folder[]}>;
+}
 
 export const getUserFiles: RequestHandler = async (req, res) => {        
   const query = req.query.query as string | undefined;
@@ -20,7 +36,7 @@ export const getUserFiles: RequestHandler = async (req, res) => {
 
   if (query === "") return res.redirect("/drive");
 
-  const path = getQueryParamsPath(req.params!);
+  const path = queryParamsPath(req.params!);
 
   const sqlFileQuery = `^${user.id}${path === "/" ? "" : path}/[^/]+/?$`
 
@@ -67,7 +83,7 @@ export const createFile: RequestHandler[] = [
   upload.single("file"),
   async (req, res, next) => {
     const user: User = req.user as User;
-    const path = getQueryParamsPath(req.params);
+    const path = queryParamsPath(req.params);
 
     const filename = req.file ? req.file.originalname : req.body.file;
     const drivePath = `${path === "/" ? "" : path}/${filename}`
@@ -160,8 +176,10 @@ export const renameFile: RequestHandler[] = [async (req, res, next) => {
 }]
 
 export const updateFiles: RequestHandler[] = [async (req, res, next) => {
-  let filePaths = [];
-  let folderPaths = [];
+  const user: User = req.user as User;
+
+  let filePaths: string[] = [];
+  let folderPaths: string[] = [];
 
   if (!(req.body.file_path instanceof Array)) {
     if ((req.body.file_path as string).endsWith("/")) folderPaths.push(req.body.file_path);
@@ -175,41 +193,81 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
         continue;
       }
 
-      folderPaths.push(path);
+      filePaths.push(path);
     };
   }
 
+  let destination: string = req.body.move || req.body.copy;
+
+  if (!destination.startsWith("/")) destination = "/" + destination;
+  if (!destination.endsWith("/")) destination += "/";
+
+  const filePathDestination = (parentPath: string, filePath: string) => {
+    const parentName = parentPath.split("/").at(-2) + "/";
+    const fileName = filePath.split("/").at(-2) + "/";
+
+    return destination + fileName; // TODO: fix this shit... every folder which has subfolders should be moved to destination.
+  }
+
+  const subfolderQueries = []
+
+  for (const path of folderPaths) subfolderQueries.push(getFolderChildrenQuery(path));
+
+  const foldersChildren: {
+    parent: string,
+    children: Folder[]
+  }[] = [];
+
+  await Promise.all(subfolderQueries).then(res => 
+    foldersChildren.push(...res)
+  );
+
+  const queries: Promise<any>[] = [];
+
+  type FileMovePaths = {originPath: string, destinationPath: string};
+
+  let foldersMovePaths: FileMovePaths[] = [];
+
+  for (const folderChildren of foldersChildren) 
+    foldersMovePaths.push(...folderChildren.children.map(subfolder => ({
+      originPath: subfolder.path, 
+      destinationPath: filePathDestination(folderChildren.parent, subfolder.path)
+    })))
+
   if (req.body.move) { // move route
-    if (folderPaths.length > 0) {
-      // TODO: iterate over all folder paths and execute an update query every loop to update the path of all target folders to destination
-      folderPaths.forEach((path: string) => {
-        const name = path.split("/")
-          .slice(0, -2)
-          .reduce((acc, cur) => `${acc !== "/" ? acc : ""}/${cur}`, "/");
-      })
+    for (const movePath of foldersMovePaths) {
+      queries.push(prisma.folder.update({
+        data: {
+          path: movePath.destinationPath
+        },
+        where: { path: movePath.originPath }
+      }));
 
-      //
-
-      // await prisma.folder.updateMany({
-        
-      // })
+      // TODO: IF THE DIRECTORY CONTAINS FILES, UPDATE SUPABASE AS WELL!
     }
+    
+    // TODO: CHECK filePaths AS WELL!
 
-    if (filePaths.length > 0) {
-  
-    }
+    await Promise.all(queries);
   }
 
-  if (req.body.copy) {
-    if (folderPaths.length > 0) {
-        
-    }
-  
-    if (filePaths.length > 0) {
-  
-    }
-  }
+  if (req.body.copy) { // copy route
 
+    for (const copyPath of foldersMovePaths) {
+      queries.push(prisma.folder.create({
+        data: {
+          ownerId: user.id,
+          path: copyPath.destinationPath
+        }
+      }));
+
+      // TODO: IF THE DIRECTORY CONTAINS FILES, UPDATE SUPABASE AS WELL!
+    }
+  
+    // TODO: CHECK filePaths AS WELL!
+
+    await Promise.all(queries);
+  }
 
   res.send();
 }]
