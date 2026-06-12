@@ -259,6 +259,19 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
         where: { path: movePath.originPath }
       }));
 
+      const supabaseOriginalPath = `${user.id}${movePath.originPath}`;
+      const supabaseDestinationPath = `${user.id}${movePath.destinationPath}`;
+
+      const folderExists = await supabase.storage.from("drives").exists(supabaseOriginalPath);
+
+      if (folderExists.error) return res.status(400).send(folderExists.error);
+
+      if (!folderExists.data) continue;
+      
+      const { error } = await supabase.storage.from("drives").move(supabaseOriginalPath, supabaseDestinationPath);
+
+      if (error) return res.status(400).send(error);
+
       // TODO: IF THE DIRECTORY CONTAINS FILES, UPDATE SUPABASE AS WELL!
     }
     
@@ -277,7 +290,18 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
         }
       }));
 
-      // TODO: IF THE DIRECTORY CONTAINS FILES, UPDATE SUPABASE AS WELL!
+      const supabaseOriginalPath = `${user.id}${copyPath.originPath}`;
+      const supabaseDestinationPath = `${user.id}${copyPath.destinationPath}`;
+
+      const folderExists = await supabase.storage.from("drives").exists(supabaseOriginalPath);
+
+      if (folderExists.error) return res.status(400).send(folderExists.error);
+
+      if (!folderExists.data) continue;
+      
+      const { error } = await supabase.storage.from("drives").copy(supabaseOriginalPath, supabaseDestinationPath);
+
+      if (error) return res.status(400).send(error);
     }
   
     // TODO: CHECK filePaths AS WELL!
