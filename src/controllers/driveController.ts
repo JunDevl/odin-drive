@@ -13,20 +13,31 @@ const queryParamsPath = (params: Record<string, any>) =>
   !params.splat || !(params.splat instanceof Array) ? "/" : 
   (params.splat as string[]).reduce((acc, cur) => `${acc !== "/" ? acc : ""}/${cur}`, "/");
 
-const getFolderChildrenQuery = (path: string) => {
-  const searchQuery = path + "%";
+const getFolderChildrenQuery = async (parentPath: string) => {
+  const searchQuery = parentPath + "%";
+
+  // TODO: SANITIZE SEARCHQUERY SO USERS CAN'T TYPE "%", "/" OR ANY INVALID CHARACTERS!
 
   const query = prisma.$queryRaw`
     SELECT * FROM "Folder"
     WHERE path LIKE ${searchQuery}
-  `;
+  ` as PrismaPromise<Folder[]>;
 
   query.then(res => ({
-    parent: path,
+    parentPath,
     children: res
   }))
 
-  return query as Promise<{parent: string, children: Folder[]}>;
+  return new Promise(async (resolve, reject) => {
+    const subfolders = await query;
+
+    resolve({
+      parentPath,
+      children: subfolders
+    });
+
+    reject(subfolders);
+  }) as Promise<{parentPath: string, children: Folder[]}>;
 }
 
 export const getUserFiles: RequestHandler = async (req, res) => {        
@@ -84,6 +95,8 @@ export const createFile: RequestHandler[] = [
   async (req, res, next) => {
     const user: User = req.user as User;
     const path = queryParamsPath(req.params);
+
+    // TODO: SANITIZE FOLDER/FILE NAME SO USERS CAN'T TYPE "%", "/" OR ANY INVALID CHARACTERS!
 
     const filename = req.file ? req.file.originalname : req.body.file;
     const drivePath = `${path === "/" ? "" : path}/${filename}`
@@ -204,23 +217,20 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
 
   const filePathDestination = (parentPath: string, filePath: string) => {
     const parentName = parentPath.split("/").at(-2) + "/";
-    const fileName = filePath.split("/").at(-2) + "/";
+    
+    const relativePath = filePath.length < parentPath.length ?
+      filePath.split("/").at(-2) + "/" :
+      filePath.slice(parentPath.length - parentName.length)
 
-    return destination + fileName; // TODO: fix this shit... every folder which has subfolders should be moved to destination.
+    return destination + relativePath;
   }
 
-  const subfolderQueries = []
-
-  for (const path of folderPaths) subfolderQueries.push(getFolderChildrenQuery(path));
+  const subfolderQueries: ReturnType<typeof getFolderChildrenQuery>[] = []
 
   const foldersChildren: {
-    parent: string,
+    parentPath: string,
     children: Folder[]
   }[] = [];
-
-  await Promise.all(subfolderQueries).then(res => 
-    foldersChildren.push(...res)
-  );
 
   const queries: Promise<any>[] = [];
 
@@ -228,10 +238,16 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
 
   let foldersMovePaths: FileMovePaths[] = [];
 
+  for (const folderPath of folderPaths) 
+    subfolderQueries.push(getFolderChildrenQuery(folderPath));
+
+  await Promise.all(subfolderQueries)
+    .then(res => foldersChildren.push(...res));
+
   for (const folderChildren of foldersChildren) 
     foldersMovePaths.push(...folderChildren.children.map(subfolder => ({
       originPath: subfolder.path, 
-      destinationPath: filePathDestination(folderChildren.parent, subfolder.path)
+      destinationPath: filePathDestination(folderChildren.parentPath, subfolder.path)
     })))
 
   if (req.body.move) { // move route
