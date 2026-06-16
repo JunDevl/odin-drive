@@ -234,6 +234,10 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
 
   const queries: Promise<any>[] = [];
 
+  supabase.storage.from("drives").list
+
+  const supabaseStorageQueries = [];
+
   type FileMovePaths = {originPath: string, destinationPath: string};
 
   let foldersMovePaths: FileMovePaths[] = [];
@@ -241,8 +245,13 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
   for (const folderPath of folderPaths) 
     subfolderQueries.push(getFolderChildrenQuery(folderPath));
 
+  const foldersAndFiles: Set<string> = new Set();
+
   await Promise.all(subfolderQueries)
-    .then(res => foldersChildren.push(...res));
+    .then(res => {
+      foldersChildren.push(...res)
+      
+    });
 
   for (const folderChildren of foldersChildren) 
     foldersMovePaths.push(...folderChildren.children.map(subfolder => ({
@@ -262,11 +271,9 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
       const supabaseOriginalPath = `${user.id}${movePath.originPath}`;
       const supabaseDestinationPath = `${user.id}${movePath.destinationPath}`;
 
-      const folderExists = await supabase.storage.from("drives").exists(supabaseOriginalPath);
+      const { data: folderExists } = await supabase.storage.from("drives").exists(supabaseOriginalPath);
 
-      if (folderExists.error) return res.status(400).send(folderExists.error);
-
-      if (!folderExists.data) continue;
+      if (!folderExists) continue;
       
       const { error } = await supabase.storage.from("drives").move(supabaseOriginalPath, supabaseDestinationPath);
 
@@ -274,8 +281,13 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
 
       // TODO: IF THE DIRECTORY CONTAINS FILES, UPDATE SUPABASE AS WELL!
     }
-    
+
     // TODO: CHECK filePaths AS WELL!
+    for (const filePath of filePaths) {
+      const supabaseOriginalPath = `${user.id}${filePath}`;
+      // const supabaseDestinationPath = `${user.id}${movePath.destinationPath}`;
+    }
+    
 
     await Promise.all(queries);
   }

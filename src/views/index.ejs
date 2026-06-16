@@ -221,6 +221,8 @@
       let hasDeleted = false;
 
       deleteForm.addEventListener("submit", async e => {
+        e.preventDefault();
+
         if (hasDeleted) return;
 
         hasDeleted = true;
@@ -231,7 +233,7 @@
           query.append("file_path", path);
         });
 
-        await fetch(`${location.origin}/drive?${query}`, {
+        const fetched = await fetch(`${location.origin}/drive?${query}`, {
           method: "DELETE"
         });
       })
@@ -257,6 +259,8 @@
 
       let hasUpdated = false;
       updateForm.addEventListener("submit", async e => {
+        e.preventDefault();
+
         if (hasUpdated) return;
         hasUpdated = true;
 
@@ -268,7 +272,7 @@
           query.append("file_path", path);
         });
 
-        await fetch(`${location.origin}/drive?${query}`, {
+        const fetched = await fetch(`${location.origin}/drive?${query}`, {
           method: "PUT",
           body: query
         });
@@ -291,6 +295,8 @@
 
       let hasRenamed = false;
       renameForm.addEventListener("submit", async e => {
+        e.preventDefault();
+
         if (hasRenamed) return;
         hasRenamed = true;
 
@@ -299,7 +305,7 @@
           rename: nameInput.value
         });
 
-        await fetch(`${location.origin}/drive?${query}`, {
+        const fetched = await fetch(`${location.origin}/drive?${query}`, {
           method: "PATCH"
         });
       })
