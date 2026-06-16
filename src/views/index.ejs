@@ -82,7 +82,7 @@
 
           nameInput.value = fileName;
 
-          renameDialog.showModal();
+          renameModal.showModal();
         });
       </script>
     </nav>
@@ -236,6 +236,8 @@
         const fetched = await fetch(`${location.origin}/drive?${query}`, {
           method: "DELETE"
         });
+
+        window.location.reload();
       })
 
       cancelDeleteButton.addEventListener("click", () => deleteModal.close());
@@ -276,6 +278,8 @@
           method: "PUT",
           body: query
         });
+
+        window.location.reload();
       });
 
       cancelUpdateButton.addEventListener("click", () => updateModal.close());
@@ -308,6 +312,8 @@
         const fetched = await fetch(`${location.origin}/drive?${query}`, {
           method: "PATCH"
         });
+
+        window.location.reload();
       })
 
       cancelRenameButton.addEventListener("click", () => renameModal.close());

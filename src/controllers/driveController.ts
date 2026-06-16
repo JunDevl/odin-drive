@@ -321,5 +321,5 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
     await Promise.all(queries);
   }
 
-  res.send();
+  return res.send();
 }]
