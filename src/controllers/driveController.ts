@@ -125,6 +125,8 @@ export const createFile: RequestHandler[] = [
 ]
 
 export const deleteFiles: RequestHandler[] = [async (req, res, next) => {
+  const user: User = req.user as User;
+
   let filePaths = [];
   let folderPaths = [];
 
@@ -149,23 +151,31 @@ export const deleteFiles: RequestHandler[] = [async (req, res, next) => {
   }
 
   if (folderPaths.length > 0) {
+    const supabasePaths: string[] = [];
+
     const pathsSqlArrayString = `{${
       folderPaths
-        .map(path => `${path}%`)
+        .map(path => {
+          supabasePaths.push(`${user.id}${path}`)
+          return `${path}%`;
+        })
         .reduce((acc, cur) => `${acc},${cur}`)
     }}`;
+
     const deletedFolders = await prisma.$queryRaw`
       DELETE FROM "Folder"
       WHERE path LIKE ANY(${pathsSqlArrayString})
     `
 
-    // TODO: DELETE SUB-FOLDERS AND CHILDREN FROM SUPABASE STORAGE AS WELL!
+    const { data, error } = await supabase.storage.from("drives").remove(supabasePaths);
   }
 
   res.send();
 }]
 
 export const renameFile: RequestHandler[] = [async (req, res, next) => {
+  const user: User = req.user as User;
+
   const {rename, path} = req.query as {rename: string, path: string};
 
   const basePath = path !== "/" ?
@@ -181,9 +191,13 @@ export const renameFile: RequestHandler[] = [async (req, res, next) => {
       data: {path: newPath},
       where: {path}
     })
-  } else { // it's a file
 
-  }
+    return res.send();
+  } 
+  
+  // it's a file
+
+  
 
   res.send();
 }]
