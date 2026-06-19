@@ -6,38 +6,44 @@ import passport from "passport";
 import prisma from "../../lib/prisma.ts";
 import supabase from "../../lib/supabase.ts";
 import multer from "multer";
-import type { PrismaPromise } from "@prisma/client/runtime/client";
+import type { PrismaPromise, Return } from "@prisma/client/runtime/client";
 const upload = multer({ storage: multer.memoryStorage() })
 
 const queryParamsPath = (params: Record<string, any>) => 
   !params.splat || !(params.splat instanceof Array) ? "/" : 
   (params.splat as string[]).reduce((acc, cur) => `${acc !== "/" ? acc : ""}/${cur}`, "/");
 
-const getFolderChildrenQuery = async (parentPath: string) => {
+const getChildrenPaths = async (parentPath: string) => {
   const searchQuery = parentPath + "%";
 
   // TODO: SANITIZE SEARCHQUERY SO USERS CAN'T TYPE "%", "/" OR ANY INVALID CHARACTERS!
 
-  const query = prisma.$queryRaw`
-    SELECT * FROM "Folder"
+  const foldersQuery = prisma.$queryRaw<string[]>`
+    SELECT path FROM "Folder"
     WHERE path LIKE ${searchQuery}
-  ` as PrismaPromise<Folder[]>;
+  `;
 
-  query.then(res => ({
-    parentPath,
-    children: res
-  }))
+  const filesQuery = prisma.$queryRaw<string[]>`
+    SELECT name FROM storage.objects
+    WHERE path LIKE ${searchQuery}
+    AND path NOT LIKE '%/'
+  `;
 
-  return new Promise(async (resolve, reject) => {
-    const subfolders = await query;
+  return new Promise<{parentPath: string, children: string[]}>(async (resolve, reject) => {
+    try {
+      const subfolders = await foldersQuery;
+      const subfiles = await filesQuery;
 
-    resolve({
-      parentPath,
-      children: subfolders
-    });
+      const all = [...subfolders, ...subfiles];
 
-    reject(subfolders);
-  }) as Promise<{parentPath: string, children: Folder[]}>;
+      resolve({
+        parentPath,
+        children: all
+      });
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
 
 export const getUserFiles: RequestHandler = async (req, res) => {        
@@ -127,48 +133,44 @@ export const createFile: RequestHandler[] = [
 export const deleteFiles: RequestHandler[] = [async (req, res, next) => {
   const user: User = req.user as User;
 
-  let filePaths = [];
-  let folderPaths = [];
+  if (!req.query.file_path) return res.status(400).send("No file paths provided.");
 
-  if (!(req.query.file_path instanceof Array)) {
-    if ((req.query.file_path as string).endsWith("/")) folderPaths.push(req.query.file_path);
-    else filePaths.push(req.query.file_path);
+  let paths = req.query.file_path instanceof Array ? String(req.query.file_path) : [String(req.query.file_path)];
+
+  let supabaseQueryString: string = '';
+
+  let folderPathsQueryString: string = '';
+
+  for (const path of paths) {
+    supabaseQueryString += `,${user.id}${path}%`
+
+    if (!path.endsWith("/")) continue;
+
+    folderPathsQueryString += `,${path}%`
   }
 
-  if (req.query.file_path instanceof Array) {
-    for (const path of req.query.file_path) {
-      if ((path as string).endsWith("/")) {
-        folderPaths.push(path);
-        continue;
-      }
+  const pathsSqlArrayString = `{${folderPathsQueryString}}`;
+  const pathsSqlSupabaseArrayString = `{${supabaseQueryString}}`
 
-      folderPaths.push(path);
-    };
-  }
+  let filesToBeDeleted: string[]
 
-  if (filePaths.length > 0) {
-
-  }
-
-  if (folderPaths.length > 0) {
-    const supabasePaths: string[] = [];
-
-    const pathsSqlArrayString = `{${
-      folderPaths
-        .map(path => {
-          supabasePaths.push(`${user.id}${path}`)
-          return `${path}%`;
-        })
-        .reduce((acc, cur) => `${acc},${cur}`)
-    }}`;
-
-    const deletedFolders = await prisma.$queryRaw`
+  try {
+    await prisma.$queryRaw`
       DELETE FROM "Folder"
       WHERE path LIKE ANY(${pathsSqlArrayString})
     `
 
-    const { data, error } = await supabase.storage.from("drives").remove(supabasePaths);
+    filesToBeDeleted = await prisma.$queryRaw`
+      SELECT name FROM storage.objects
+      WHERE name LIKE ANY (${pathsSqlSupabaseArrayString})
+    `
+  } catch (e) {
+    return res.status(400).send(e);
   }
+
+  const { error } = await supabase.storage.from("drives").remove(filesToBeDeleted);
+
+  if (error) res.status(400).send(error);
 
   res.send();
 }]
@@ -178,26 +180,61 @@ export const renameFile: RequestHandler[] = [async (req, res, next) => {
 
   const {rename, path} = req.query as {rename: string, path: string};
 
-  const basePath = path !== "/" ?
-    path.split("/")
-      .slice(0, -2)
-      .reduce((acc, cur) => `${acc}/${cur}`) :
-    "";
+  const isFolder = path.endsWith('/');
 
-  if (path.endsWith("/")) { // it's a folder
-    const newPath = `${basePath}/${rename}/`
+  const getBasePath = (path: string) => {
+    const lastIndex = path.slice(0, -1).lastIndexOf("/") >= 0 ? path.slice(0, -1).lastIndexOf("/") : 0;
 
-    await prisma.folder.update({
-      data: {path: newPath},
-      where: {path}
-    })
+    if (lastIndex < 0) return res.status(400).send("Path must point to a valid parent folder.");
 
+    return lastIndex ? path.slice(0, lastIndex) : "/";
+  }
+
+  const basePath = getBasePath(path);
+
+  let newPath = `${basePath}/${rename}/`;
+
+  if (!isFolder) {
+    const { error } = await supabase.storage.from("drives").move(`${user.id}${path}`, `${user.id}${newPath}`);
+
+    if (error) return res.status(400).send(error);
+    
     return res.send();
-  } 
-  
-  // it's a file
+  }
 
-  
+  let childrenPaths: string[];
+
+  const queries: Promise<any>[] = [];
+
+  try {
+    childrenPaths = (await getChildrenPaths(path)).children;
+  } catch (e) {
+    return res.status(400).send(e);
+  }
+
+  for (let path of childrenPaths) {
+    const isChildFolder = path.endsWith('/');
+
+    const supabaseOriginPath = `${user.id}${path}`;
+    const supabaseNewPath = `${user.id}${newPath}`;
+
+    if (isChildFolder) {
+      queries.push(prisma.folder.update({
+        data: {path: newPath},
+        where: {path}
+      }))
+
+      const { data: folderExists } = await supabase.storage.from("drives").exists(supabaseOriginPath);
+
+      if (!folderExists) continue;
+    }
+
+    const { error } = await supabase.storage.from("drives").move(supabaseOriginPath, supabaseNewPath);
+
+    if (error) return res.status(400).send(error);
+  }
+
+  // FIXME: Wtf is wrong with this renameFile function... It's completely and utterly shit.
 
   res.send();
 }]
@@ -205,24 +242,9 @@ export const renameFile: RequestHandler[] = [async (req, res, next) => {
 export const updateFiles: RequestHandler[] = [async (req, res, next) => {
   const user: User = req.user as User;
 
-  let filePaths: string[] = [];
-  let folderPaths: string[] = [];
+  if (!req.query.file_path) return res.status(400).send("No file paths provided.");
 
-  if (!(req.body.file_path instanceof Array)) {
-    if ((req.body.file_path as string).endsWith("/")) folderPaths.push(req.body.file_path);
-    else filePaths.push(req.body.file_path);
-  }
-
-  if (req.body.file_path instanceof Array) {
-    for (const path of req.body.file_path) {
-      if ((path as string).endsWith("/")) {
-        folderPaths.push(path);
-        continue;
-      }
-
-      filePaths.push(path);
-    };
-  }
+  const paths = req.query.file_path instanceof Array ? String(req.query.file_path) : [String(req.query.file_path)];
 
   let destination: string = req.body.move || req.body.copy;
 
@@ -239,100 +261,81 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
     return destination + relativePath;
   }
 
-  const subfolderQueries: ReturnType<typeof getFolderChildrenQuery>[] = []
+  const childrenQueries: ReturnType<typeof getChildrenPaths>[] = []
 
   const foldersChildren: {
     parentPath: string,
-    children: Folder[]
+    children: string[]
   }[] = [];
 
-  const queries: Promise<any>[] = [];
+  const prismaQueries: Promise<any>[] = [];
+  const supabaseQueries: Promise<any>[] = [];
 
-  supabase.storage.from("drives").list
+  // supabase.storage.from("drives").list
 
   const supabaseStorageQueries = [];
 
-  type FileMovePaths = {originPath: string, destinationPath: string};
+  type MovePath = {originPath: string, destinationPath: string};
 
-  let foldersMovePaths: FileMovePaths[] = [];
+  let movePaths: MovePath[] = [];
 
-  for (const folderPath of folderPaths) 
-    subfolderQueries.push(getFolderChildrenQuery(folderPath));
+  for (const path of paths) 
+    if (path.endsWith("/")) childrenQueries.push(getChildrenPaths(path));
 
   const foldersAndFiles: Set<string> = new Set();
 
-  await Promise.all(subfolderQueries)
-    .then(res => {
-      foldersChildren.push(...res)
-      
-    });
-
-  for (const folderChildren of foldersChildren) 
-    foldersMovePaths.push(...folderChildren.children.map(subfolder => ({
-      originPath: subfolder.path, 
-      destinationPath: filePathDestination(folderChildren.parentPath, subfolder.path)
-    })))
-
-  if (req.body.move) { // move route
-    for (const movePath of foldersMovePaths) {
-      queries.push(prisma.folder.update({
-        data: {
-          path: movePath.destinationPath
-        },
-        where: { path: movePath.originPath }
-      }));
-
-      const supabaseOriginalPath = `${user.id}${movePath.originPath}`;
-      const supabaseDestinationPath = `${user.id}${movePath.destinationPath}`;
-
-      const { data: folderExists } = await supabase.storage.from("drives").exists(supabaseOriginalPath);
-
-      if (!folderExists) continue;
-      
-      const { error } = await supabase.storage.from("drives").move(supabaseOriginalPath, supabaseDestinationPath);
-
-      if (error) return res.status(400).send(error);
-
-      // TODO: IF THE DIRECTORY CONTAINS FILES, UPDATE SUPABASE AS WELL!
-    }
-
-    // TODO: CHECK filePaths AS WELL!
-    for (const filePath of filePaths) {
-      const supabaseOriginalPath = `${user.id}${filePath}`;
-      // const supabaseDestinationPath = `${user.id}${movePath.destinationPath}`;
-    }
-    
-
-    await Promise.all(queries);
+  try {
+    await Promise.all(childrenQueries).then(res => foldersChildren.push(...res));
+  } catch (e) {
+    res.status(400).send(e);
   }
 
-  if (req.body.copy) { // copy route
+  for (const folderChildren of foldersChildren) 
+    movePaths.push(...folderChildren.children.map(childPath => ({
+      originPath: childPath, 
+      destinationPath: filePathDestination(folderChildren.parentPath, childPath)
+    })))
 
-    for (const copyPath of foldersMovePaths) {
-      queries.push(prisma.folder.create({
-        data: {
-          ownerId: user.id,
-          path: copyPath.destinationPath
-        }
-      }));
+  for (const updatePath of movePaths) {
+    let {originPath, destinationPath} = updatePath;
 
-      const supabaseOriginalPath = `${user.id}${copyPath.originPath}`;
-      const supabaseDestinationPath = `${user.id}${copyPath.destinationPath}`;
+    const isFolder = originPath.endsWith("/");
+    
+    if (isFolder) {
+      prismaQueries.push(req.body.move ? 
+        prisma.folder.update({
+          data: {
+            path: destinationPath
+          },
+          where: { path: originPath }
+        }) :
+        prisma.folder.create({
+          data: {
+            ownerId: user.id,
+            path: destinationPath
+          }
+        })
+      );
 
-      const folderExists = await supabase.storage.from("drives").exists(supabaseOriginalPath);
+      originPath = `${user.id}${originPath}`;
+      destinationPath = `${user.id}${destinationPath}`;
 
-      if (folderExists.error) return res.status(400).send(folderExists.error);
-
-      if (!folderExists.data) continue;
-      
-      const { error } = await supabase.storage.from("drives").copy(supabaseOriginalPath, supabaseDestinationPath);
-
-      if (error) return res.status(400).send(error);
-    }
+      const { data: folderExists } = await supabase.storage.from("drives").exists(originPath);
   
-    // TODO: CHECK filePaths AS WELL!
+      if (!folderExists) continue;
+    }
+    
+    supabaseQueries.push(req.body.move ? 
+      supabase.storage.from("drives").move(originPath, destinationPath) :
+      supabase.storage.from("drives").copy(originPath, destinationPath)
+    );
+  }
 
-    await Promise.all(queries);
+  try {
+    await Promise.all(prismaQueries);
+    await Promise.all(supabaseQueries); // FIXME: this is not how supabase handles errors...
+  } catch (e) {
+    res.status(400).send();
   }
 
   return res.send();
