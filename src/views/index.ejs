@@ -104,7 +104,7 @@
         <% if (files.length > 0) {%>
           <% files.forEach(file => { %>
             <tr class="<%= file.kind %>" id="<%= file.path %>" data-name="<%= file.name %>">
-              <td class="select"><input type="checkbox"></td>
+              <td class="select"><input type="checkbox" autocomplete="off"></td>
               <td class="icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
               <td class="file_name">
                 <% if (file.kind !== "folder") { %>
@@ -248,7 +248,11 @@
       <p><span class="update_verb"></span> <span class="file_count"></span> file(s) to destination</p>
       <div class="destination_input">
         <p class="root">/</p>
-        <input type="text" class="destination" placeholder="Destination Path">
+        <input 
+          class="destination" 
+          placeholder="Destination Path" 
+          value="<%= path.slice(1) %>"
+        >
       </div>
       <button type="submit" class="update"><span class="update_term"></span></button>
       <button type="button" class="cancel">Cancel</button>

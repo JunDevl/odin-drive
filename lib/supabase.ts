@@ -8,5 +8,5 @@ const supabase = createClient(
 
 export default supabase;
 
-// supabase.storage.from("drives").upload("bd2b466c-9949-471f-a7e2-14062bf0bcad")
-//   .then(res => console.log(res));
+supabase.storage.from("drives").copy("bd2b466c-9949-471f-a7e2-14062bf0bcad/ATA Casamento Vanessa e Estevam.docx.pdf", "bd2b466c-9949-471f-a7e2-14062bf0bcad/oof/ATA Casamento Vanessa e Estevam.docx.pdf")
+  .then(res => console.log(res));
