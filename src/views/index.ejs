@@ -101,8 +101,8 @@
             <td colspan="4"><a href="<%= `/drive${path.slice(0, -(path.split("/").at(-1).length + 1))}` %>">&lt;--</a></td>
           </tr>
         <% } %>
-        <% if (files.length > 0) {%>
-          <% files.forEach(file => { %>
+        <% if (foldersAndFiles.length > 0) {%>
+          <% foldersAndFiles.forEach(file => { %>
             <tr class="<%= file.kind %>" id="<%= file.path %>" data-name="<%= file.name %>">
               <td class="select"><input type="checkbox" autocomplete="off"></td>
               <td class="icon"><img class="file_icon" alt="File/Folder Icon"></img></td>
@@ -161,7 +161,13 @@
         }
 
         function handleFileClick(e) {
+          const row = e.target.closest("tr");
 
+          const path = row.id;
+
+          downloadDialog.dataset.path = path;
+
+          downloadDialog.showModal();
         }
 
         table.addEventListener("click", e => {
@@ -322,6 +328,38 @@
 
       cancelRenameButton.addEventListener("click", () => renameModal.close());
     </script>
+  </dialog>
+  <dialog id="download_dialog" closedby="any" data-path="">
+    <form id="download_form">
+      <p class="file_name"><!-- File name here --></p>
+      <p class="file_size"><!-- File size here --></p>
+      <button type="submit" class="download">Download</button>
+      <script>
+        const downloadDialog = document.querySelector("dialog#download_dialog");
+        const downloadForm = document.querySelector("form#download_form");
+
+        let hasSubmitted = false;
+        downloadForm.addEventListener("submit", async e => {
+          e.preventDefault();
+
+          if (hasSubmitted) return;
+          hasSubmitted = true;
+
+          const query = new URLSearchParams({
+            download: downloadDialog.dataset.path,
+          });
+
+          const downloaded = await fetch(`${location.origin}/drive?${query}`, {
+            method: "GET"
+          });
+
+          const blob = await downloaded.blob();
+
+          const file = window.URL.createObjectURL(blob);
+          window.location.assign(file);
+        })
+      </script>
+    </form>
   </dialog>
 </body>
 

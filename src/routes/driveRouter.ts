@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createFile, deleteFiles, getUserFiles, renameFile, updateFiles } from "../controllers/driveController.ts";
+import { createFile, deleteFiles, downloadUserFile, getUserFiles, renameFile, updateFiles } from "../controllers/driveController.ts";
 
 
 const driveRouter = Router();
@@ -10,7 +10,7 @@ driveRouter.use((req, res, next) => {
 });
 
 driveRouter.route("/{*splat}")
-  .get(getUserFiles)
+  .get(getUserFiles, downloadUserFile)
   .delete(deleteFiles)
   .post(createFile)
   .patch(renameFile)

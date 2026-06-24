@@ -47,7 +47,9 @@ const getChildrenPaths = async (userUUID: UUID, parentPath: string) => {
   });
 }
 
-export const getUserFiles: RequestHandler = async (req, res) => {        
+export const getUserFiles: RequestHandler = async (req, res, next) => {       
+  if (req.query.download) return next();
+  
   const query = req.query.query as string | undefined;
 
   const user: User = req.user as User;
@@ -76,7 +78,7 @@ export const getUserFiles: RequestHandler = async (req, res) => {
     folder.kind = "folder";
   });
 
-  let files: Record<string, any>[] = await prisma.$queryRaw`
+  const files: Record<string, any>[] = await prisma.$queryRaw`
     SELECT name, created_at, updated_at, path_tokens, metadata::jsonb FROM storage.objects 
     WHERE array_to_string(path_tokens, '/') ~ ${sqlFileQuery}
     ORDER BY name
@@ -92,9 +94,21 @@ export const getUserFiles: RequestHandler = async (req, res) => {
     file.kind = "file";
   });
 
-  files = [...folders, ...files];
+  const foldersAndFiles = [...folders, ...files];
 
-  res.render("index", { files, query, path, pathArray: req.params.splat });
+  res.render("index", { foldersAndFiles, query, path, pathArray: req.params.splat });
+}
+
+export const downloadUserFile: RequestHandler = async (req, res) => {
+  const user: User = req.user as User;
+
+  const path = String(req.query.download);
+
+  const { data, error } = await supabase.storage.from("drives").download(`${user.id}${path}`);
+
+  if (error) return res.status(400).send(error);
+
+  return res.send(data);
 }
 
 export const createFile: RequestHandler[] = [
@@ -215,7 +229,7 @@ export const renameFile: RequestHandler[] = [async (req, res, next) => {
     const originPath = `${user.id}${path}`;
     const renamePath = `${user.id}${newPath}`;
 
-    const { error } = await supabase.storage.from("drives").move(originPath, renamePath);
+    const { error } = await supabase.storage.from("drives").move(originPath, renamePath); // although everything here is correct, this "move" method doesn't work, and i don't know why.
 
     if (error) return res.status(400).send(error);
     
@@ -253,7 +267,7 @@ export const renameFile: RequestHandler[] = [async (req, res, next) => {
       // if (!folderExistsInSupabase) continue;
     }
 
-    const { error } = await supabase.storage.from("drives").move(supabaseOriginPath, supabaseNewPath);
+    const { error } = await supabase.storage.from("drives").move(supabaseOriginPath, supabaseNewPath); // although everything here is correct, this "move" method doesn't work, and i don't know why.
 
     if (error) errorMessages.push(error);
   }
@@ -348,7 +362,7 @@ export const updateFiles: RequestHandler[] = [async (req, res, next) => {
     destinationPath = `${user.id}${destinationPath}`;
     
     supabaseQueries.push(req.body.move ? 
-      supabase.storage.from("drives").move(originPath, destinationPath) :
+      supabase.storage.from("drives").move(originPath, destinationPath) : // although everything here is correct, this "move" method doesn't work, and i don't know why.
       supabase.storage.from("drives").copy(originPath, destinationPath)
     );
   }
