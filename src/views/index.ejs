@@ -190,7 +190,7 @@
     <div>
       <button class="create_folder">Folder</button>
       <form method="POST" enctype="multipart/form-data">
-        <input type="file" class="file" name="file" />
+        <input type="file" class="file" name="file" required/>
         <button type="submit">Send</button>
       </form>
     </div>
@@ -345,8 +345,11 @@
           if (hasSubmitted) return;
           hasSubmitted = true;
 
+          const filePath = String(downloadDialog.dataset.path);
+          const fileName = filePath.slice(filePath.lastIndexOf("/") + 1);
+
           const query = new URLSearchParams({
-            download: downloadDialog.dataset.path,
+            download: filePath,
           });
 
           const downloaded = await fetch(`${location.origin}/drive?${query}`, {
@@ -355,8 +358,17 @@
 
           const blob = await downloaded.blob();
 
-          const file = window.URL.createObjectURL(blob);
-          window.location.assign(file);
+          const fileURL = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = fileURL;
+          a.download = fileName;
+
+          document.body.appendChild(a);
+          a.click();
+
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
         })
       </script>
     </form>

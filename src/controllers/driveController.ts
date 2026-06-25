@@ -108,7 +108,11 @@ export const downloadUserFile: RequestHandler = async (req, res) => {
 
   if (error) return res.status(400).send(error);
 
-  return res.send(data);
+  res.type(data.type);
+
+  const buffer = await data.arrayBuffer();
+
+  return res.send(Buffer.from(buffer));
 }
 
 export const createFile: RequestHandler[] = [
@@ -131,7 +135,7 @@ export const createFile: RequestHandler[] = [
 
       if (error) return res.status(400).send(error);
 
-      return res.send();
+      return res.redirect(`/drive${path}`);
     }
 
     await prisma.folder.create({
@@ -141,7 +145,7 @@ export const createFile: RequestHandler[] = [
       }
     });
 
-    return res.send();
+    return res.redirect(`/drive${path}`);
   }
 ]
 
